@@ -8,6 +8,8 @@ import android.view.ViewGroup
 import android.view.ViewGroup.MarginLayoutParams
 import android.widget.ImageButton
 import androidx.cardview.widget.CardView
+import androidx.core.content.ContextCompat
+import androidx.core.view.ViewCompat
 import androidx.recyclerview.widget.RecyclerView
 import com.shinjaehun.mymemory.models.BoardSize
 import com.shinjaehun.mymemory.models.MemoryCard
@@ -59,6 +61,11 @@ class MemoryBoardAdapter(
             // imageButton.setImageResource(if (cards[position].isFaceUp) cards[position].identifier else R.drawable.ic_launcher_background) // 그냥 이렇게 해도 될꺼 같은디...
             val memoryCard = cards[position]
             imageButton.setImageResource(if (memoryCard.isFaceUp) memoryCard.identifier else R.drawable.ic_launcher_background)
+
+            // 짝을 맞췄을 때 흐림 효과
+            imageButton.alpha = if (memoryCard.isMatched) .4f else 1.0f
+            val colorStateList = if (memoryCard.isMatched) ContextCompat.getColorStateList(context, R.color.color_gray) else null
+            ViewCompat.setBackgroundTintList(imageButton, colorStateList)
 
             imageButton.setOnClickListener{
                 Log.i(TAG,"Clicked on position $position")
