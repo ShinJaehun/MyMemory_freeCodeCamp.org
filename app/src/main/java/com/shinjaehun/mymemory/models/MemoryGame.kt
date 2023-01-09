@@ -9,8 +9,9 @@ class MemoryGame(private val boardSize: BoardSize){
 
     private var numCardFlips = 0
 
-    private var indexOfSingleSelectedCard: Int? = null;
+    private var indexOfSingleSelectedCard: Int? = null; // 카드를 뒤집지 않은 상태에서는 null
 
+    // 초기화하면서 카드 페어에 맞게 이미지 섞어 선택하고, 두 벌을 다시 섞음. 이미지를 map으로 MemoryCard 생성(이미지 resource id가 MemoryCard의 identifier
     init {
         val chosenImages = DEFAULT_ICONS.shuffled().take(boardSize.getNumPairs())
         val randomizedImages = (chosenImages + chosenImages).shuffled()

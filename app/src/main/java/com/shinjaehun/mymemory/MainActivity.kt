@@ -49,6 +49,11 @@ class MainActivity : AppCompatActivity() {
         tvNumPairs = findViewById(R.id.tvNumPairs)
         clRoot = findViewById(R.id.clRoot)
 
+        // create activity 테스트 코드
+        val intent = Intent(this, CreateActivity::class.java)
+        intent.putExtra(EXTRA_BOARD_SIZE, BoardSize.MEDIUM)
+        startActivity(intent)
+
         setupBoard()
     }
 
@@ -177,7 +182,7 @@ class MainActivity : AppCompatActivity() {
         // actually flip over the card
         if(memoryGame.flipCard(position)){
             Log.i(TAG, "Found a match! Num paris found: ${memoryGame.numPairsFound}")
-            // android에서 color interpolation하는 방법 잘 알아둘 것!
+            // android에서 color interpolation : 카드 뒤집을때마다 tvNumPairs 글자 색깔 바꾸기
             val color = ArgbEvaluator().evaluate(
                 memoryGame.numPairsFound.toFloat() / boardSize.getNumPairs(),
                 ContextCompat.getColor(this, R.color.color_progress_none),
