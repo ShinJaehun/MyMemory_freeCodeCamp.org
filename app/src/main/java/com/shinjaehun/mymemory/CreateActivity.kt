@@ -21,6 +21,9 @@ import android.widget.EditText
 import android.widget.Toast
 import androidx.recyclerview.widget.GridLayoutManager
 import androidx.recyclerview.widget.RecyclerView
+import com.google.firebase.firestore.ktx.firestore
+import com.google.firebase.ktx.Firebase
+import com.google.firebase.storage.ktx.storage
 import com.shinjaehun.mymemory.models.BoardSize
 import com.shinjaehun.mymemory.utils.BitmapScaler
 import com.shinjaehun.mymemory.utils.EXTRA_BOARD_SIZE
@@ -48,6 +51,9 @@ class CreateActivity : AppCompatActivity() {
     private var numImagesRequired = -1
 
     private val chosenImageUris = mutableListOf<Uri>()
+
+    private val storage = Firebase.storage
+    private val db = Firebase.firestore
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -144,10 +150,40 @@ class CreateActivity : AppCompatActivity() {
 
     // 이미지를 FB로 전달?
     private fun saveDataToFireBase() {
+        val customGameName = etGameName.text.toString()
         Log.i(TAG, "saveDataToFirebase")
+        var didEncounterError = false
+        val uploadedImageUrls = mutableListOf<String>()
         for ((index, photoUri) in chosenImageUris.withIndex()) {
-            val imageByteArray = getImageByteArray(photoUri)
+            val imageByteArray = getImageByteArray(photoUri) // uri to byte stream
+            val filePath = "images/$customGameName/${System.currentTimeMillis()}-${index}.jpg"
+            val photoReference = storage.reference.child(filePath) // file path에 byte stream을 이런 식으로 연결
+            photoReference.putBytes(imageByteArray) // firebase api : upload to storage
+                .continueWithTask{ photoUploadTask ->
+                    Log.i(TAG, "Uploaded bytes: ${photoUploadTask.result?.bytesTransferred}")
+                    photoReference.downloadUrl
+                }.addOnCompleteListener{ downloadUrlTask ->
+                    if (!downloadUrlTask.isSuccessful) {
+                        Log.e(TAG, "Exception with Firebase storage", downloadUrlTask.exception)
+                        Toast.makeText(this, "Failed to upload image", Toast.LENGTH_SHORT).show()
+                        didEncounterError = true
+                        return@addOnCompleteListener
+                    }
+                    if (didEncounterError) {
+                        return@addOnCompleteListener
+                    }
+                    val downloadUrl = downloadUrlTask.result.toString()
+                    uploadedImageUrls.add(downloadUrl)
+                    Log.i(TAG, "finished uploading $photoUri, num uploaded ${uploadedImageUrls.size}")
+                    if (uploadedImageUrls.size == chosenImageUris.size) { // if upload finish,
+                        handleAllImagesUploaded(customGameName, uploadedImageUrls)
+                    }
+                }
         }
+    }
+
+    private fun handleAllImagesUploaded(gameName: String, imageUrls: MutableList<String>) {
+        // upload this info to firestore
     }
 
     // 이미지 uri 전달해서 바이트 배열로 받아오기
@@ -159,7 +195,7 @@ class CreateActivity : AppCompatActivity() {
         } else {
             MediaStore.Images.Media.getBitmap(contentResolver, photoUri)
         }
-        // 이미지 압축 처리
+        // 이미지 압축 처리(JPEG 형식으로...scale down)
         Log.i(TAG, "Original width ${originalBitmap.width} and height ${originalBitmap.height}")
         val scaledBitmap = BitmapScaler.scaleToFitHeight(originalBitmap, 250)
         Log.i(TAG, "Scaled width ${scaledBitmap.width} and ${scaledBitmap.height}")

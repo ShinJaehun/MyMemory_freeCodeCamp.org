@@ -51,7 +51,7 @@ class MainActivity : AppCompatActivity() {
 
         // create activity 테스트 코드
         val intent = Intent(this, CreateActivity::class.java)
-        intent.putExtra(EXTRA_BOARD_SIZE, BoardSize.MEDIUM)
+        intent.putExtra(EXTRA_BOARD_SIZE, BoardSize.EASY)
         startActivity(intent)
 
         setupBoard()
