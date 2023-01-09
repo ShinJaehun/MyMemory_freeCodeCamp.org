@@ -4,9 +4,16 @@ import android.app.Activity
 import android.content.ClipData
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.graphics.Bitmap
+import android.graphics.ImageDecoder
 import android.net.Uri
+import android.os.Build
 import androidx.appcompat.app.AppCompatActivity
 import android.os.Bundle
+import android.provider.MediaStore
+import android.text.Editable
+import android.text.InputFilter
+import android.text.TextWatcher
 import android.util.Log
 import android.view.MenuItem
 import android.widget.Button
@@ -15,9 +22,11 @@ import android.widget.Toast
 import androidx.recyclerview.widget.GridLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.shinjaehun.mymemory.models.BoardSize
+import com.shinjaehun.mymemory.utils.BitmapScaler
 import com.shinjaehun.mymemory.utils.EXTRA_BOARD_SIZE
 import com.shinjaehun.mymemory.utils.isPermissionGranted
 import com.shinjaehun.mymemory.utils.requestPermission
+import java.io.ByteArrayOutputStream
 
 class CreateActivity : AppCompatActivity() {
 
@@ -26,6 +35,8 @@ class CreateActivity : AppCompatActivity() {
         private const val PICK_PHOTO_CODE = 655
         private const val READ_EXTERNAL_PHOTO_CODE = 248
         private const val READ_PHOTO_PERMISSION = android.Manifest.permission.READ_EXTERNAL_STORAGE
+        private const val MIN_GAME_NAME_LENGTH = 3
+        private const val MAX_GAME_NAME_LENGTH = 14
     }
 
     private lateinit var adapter: ImagePickerAdapter
@@ -51,6 +62,22 @@ class CreateActivity : AppCompatActivity() {
         numImagesRequired = boardSize.getNumPairs()
         supportActionBar?.title = "Choose pics (0 / ${numImagesRequired})"
 
+        // etGameName 필터링/textChangedListener
+        etGameName.filters = arrayOf(InputFilter.LengthFilter(MAX_GAME_NAME_LENGTH))
+        etGameName.addTextChangedListener(object: TextWatcher {
+            override fun afterTextChanged(p0: Editable?) {
+                btnSave.isEnabled = shouldEnableSaveButton()
+            }
+            override fun beforeTextChanged(p0: CharSequence?, p1: Int, p2: Int, p3: Int) {}
+            override fun onTextChanged(p0: CharSequence?, p1: Int, p2: Int, p3: Int) {}
+        })
+
+        // btnSave
+        btnSave.setOnClickListener {
+            saveDataToFireBase()
+        }
+
+        // adapter
         adapter = ImagePickerAdapter(this, chosenImageUris, boardSize, object: ImagePickerAdapter.ImageClickListener{
             override fun onPlaceholderClicked() {
                 if(isPermissionGranted(this@CreateActivity, READ_PHOTO_PERMISSION)) {
@@ -65,13 +92,14 @@ class CreateActivity : AppCompatActivity() {
         rvImagePicker.layoutManager = GridLayoutManager(this, boardSize.getWidth())
     }
 
+    // requestPermission() 결과 처리
     override fun onRequestPermissionsResult(
         requestCode: Int,
         permissions: Array<out String>,
         grantResults: IntArray
     ) {
         if(requestCode == READ_EXTERNAL_PHOTO_CODE) {
-            if(grantResults.isNotEmpty() && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+            if(grantResults.isNotEmpty() && grantResults[0] == PackageManager.PERMISSION_GRANTED) { // 권한이 존재하면
                 launchIntentForPhotos()
             } else {
                 Toast.makeText(this, "In order to create a custom game, you need to provide access to your photos", Toast.LENGTH_LONG).show()
@@ -88,6 +116,7 @@ class CreateActivity : AppCompatActivity() {
         return super.onOptionsItemSelected(item)
     }
 
+    // startActivityResult()의 결과로 받아온 uri 처리
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         super.onActivityResult(requestCode, resultCode, data)
         if(requestCode != PICK_PHOTO_CODE || resultCode != Activity.RESULT_OK || data == null) {
@@ -96,7 +125,7 @@ class CreateActivity : AppCompatActivity() {
         }
         val selectedUri: Uri? = data.data // single image
         val clipData: ClipData? = data.clipData // multi images
-        if (clipData != null) {
+        if (clipData != null) { // multi image처리
             Log.i(TAG, "clipData numImages ${clipData.itemCount}: $clipData")
             for (i in 0 until clipData.itemCount) {
                 val clipItem = clipData.getItemAt(i)
@@ -104,20 +133,54 @@ class CreateActivity : AppCompatActivity() {
                     chosenImageUris.add(clipItem.uri)
                 }
             }
-        } else if (selectedUri != null) {
+        } else if (selectedUri != null) { // single image 처리
             Log.i(TAG, "data: $selectedUri")
             chosenImageUris.add(selectedUri)
         }
-        adapter.notifyDataSetChanged()
-        supportActionBar?.title="Choose pics (${chosenImageUris.size} / $numImagesRequired)"
-        btnSave.isEnabled = shouldEnableSaveButton()
+        adapter.notifyDataSetChanged() // adapter 갱신
+        supportActionBar?.title="Choose pics (${chosenImageUris.size} / $numImagesRequired)" // bar title에 선택한 이미지 표시
+        btnSave.isEnabled = shouldEnableSaveButton() // save btn 활성화 여부 확인
     }
 
+    // 이미지를 FB로 전달?
+    private fun saveDataToFireBase() {
+        Log.i(TAG, "saveDataToFirebase")
+        for ((index, photoUri) in chosenImageUris.withIndex()) {
+            val imageByteArray = getImageByteArray(photoUri)
+        }
+    }
+
+    // 이미지 uri 전달해서 바이트 배열로 받아오기
+    private fun getImageByteArray(photoUri: Uri): ByteArray {
+        // 버전에 따라 이미지 처리 방법이 다름
+        val originalBitmap = if(Build.VERSION.SDK_INT >= Build.VERSION_CODES.P){
+            val source = ImageDecoder.createSource(contentResolver, photoUri)
+            ImageDecoder.decodeBitmap(source)
+        } else {
+            MediaStore.Images.Media.getBitmap(contentResolver, photoUri)
+        }
+        // 이미지 압축 처리
+        Log.i(TAG, "Original width ${originalBitmap.width} and height ${originalBitmap.height}")
+        val scaledBitmap = BitmapScaler.scaleToFitHeight(originalBitmap, 250)
+        Log.i(TAG, "Scaled width ${scaledBitmap.width} and ${scaledBitmap.height}")
+        val byteOutputStream = ByteArrayOutputStream()
+        scaledBitmap.compress(Bitmap.CompressFormat.JPEG, 60, byteOutputStream)
+        return byteOutputStream.toByteArray()
+    }
+
+    // save btn 활성화 여부 확인
     private fun shouldEnableSaveButton(): Boolean {
         // check if we should enable the save button or not
+        if (chosenImageUris.size != numImagesRequired) {
+            return false
+        }
+        if (etGameName.text.isBlank() || etGameName.text.length < MIN_GAME_NAME_LENGTH) {
+            return false
+        }
         return true
     }
 
+    // photo 선택할 프로그램을 implicit intent로 실행
     private fun launchIntentForPhotos() {
         val intent = Intent(Intent.ACTION_PICK)
         intent.type = "image/*"
