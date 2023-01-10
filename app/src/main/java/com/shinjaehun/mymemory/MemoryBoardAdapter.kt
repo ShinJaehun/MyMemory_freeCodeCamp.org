@@ -13,6 +13,7 @@ import androidx.core.view.ViewCompat
 import androidx.recyclerview.widget.RecyclerView
 import com.shinjaehun.mymemory.models.BoardSize
 import com.shinjaehun.mymemory.models.MemoryCard
+import com.squareup.picasso.Picasso
 import kotlin.math.min
 
 class MemoryBoardAdapter(
@@ -57,10 +58,19 @@ class MemoryBoardAdapter(
     inner class ViewHolder(itemView: View): RecyclerView.ViewHolder(itemView) {
         private val imageButton = itemView.findViewById<ImageButton>(R.id.imageButton)
         fun bind(position: Int) {
-//            imageButton.setImageResource(cardImages[position]) // 걍 imageButton 위에 이미지 씌우기
-            // imageButton.setImageResource(if (cards[position].isFaceUp) cards[position].identifier else R.drawable.ic_launcher_background) // 그냥 이렇게 해도 될꺼 같은디...
             val memoryCard = cards[position]
-            imageButton.setImageResource(if (memoryCard.isFaceUp) memoryCard.identifier else R.drawable.ic_launcher_background)
+
+//            imageButton.setImageResource(if (memoryCard.isFaceUp) memoryCard.identifier else R.drawable.ic_launcher_background)
+
+            if (memoryCard.isFaceUp) { // 근데 이렇게 하지 말고 아예 처음부터 custom image인지 확인한 다음에 카드를 모두 받아두는게 맞지 않나?
+                if (memoryCard.imageUrl != null) {
+                    Picasso.get().load(memoryCard.imageUrl).into(imageButton)
+                } else {
+                    imageButton.setImageResource(memoryCard.identifier)
+                }
+            } else {
+                imageButton.setImageResource(R.drawable.ic_launcher_background)
+            }
 
             // 짝을 맞췄을 때 흐림 효과
             imageButton.alpha = if (memoryCard.isMatched) .4f else 1.0f

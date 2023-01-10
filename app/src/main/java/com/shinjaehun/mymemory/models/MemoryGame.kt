@@ -2,7 +2,10 @@ package com.shinjaehun.mymemory.models
 
 import com.shinjaehun.mymemory.utils.DEFAULT_ICONS
 
-class MemoryGame(private val boardSize: BoardSize){
+class MemoryGame(
+    private val boardSize: BoardSize,
+    private val customImages: List<String>?
+){
 
     val cards: List<MemoryCard>
     var numPairsFound = 0
@@ -13,9 +16,14 @@ class MemoryGame(private val boardSize: BoardSize){
 
     // 초기화하면서 카드 페어에 맞게 이미지 섞어 선택하고, 두 벌을 다시 섞음. 이미지를 map으로 MemoryCard 생성(이미지 resource id가 MemoryCard의 identifier
     init {
-        val chosenImages = DEFAULT_ICONS.shuffled().take(boardSize.getNumPairs())
-        val randomizedImages = (chosenImages + chosenImages).shuffled()
-        cards = randomizedImages.map { MemoryCard(it) }
+        if (customImages == null) {
+            val chosenImages = DEFAULT_ICONS.shuffled().take(boardSize.getNumPairs())
+            val randomizedImages = (chosenImages + chosenImages).shuffled()
+            cards = randomizedImages.map { MemoryCard(it) }
+        } else {
+            val randomizeImages = (customImages + customImages).shuffled()
+            cards = randomizeImages.map { MemoryCard(it.hashCode(), it)} // identifier는 hashCode()를 이용해서 생성!
+        }
     }
 
     fun flipCard(position: Int): Boolean {
