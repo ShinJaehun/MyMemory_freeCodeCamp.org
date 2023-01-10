@@ -123,7 +123,8 @@ class CreateActivity : AppCompatActivity() {
         return super.onOptionsItemSelected(item)
     }
 
-    // startActivityResult()의 결과로 받아온 uri 처리
+    // launchIntentForPhotos()에서 startActivityResult()의 결과로 이미지 선택하는 앱 실행
+    // 실행 결과 선택한 이미지가 chosenImageUris에 저장되면서 adapter 갱신
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         super.onActivityResult(requestCode, resultCode, data)
         if(requestCode != PICK_PHOTO_CODE || resultCode != Activity.RESULT_OK || data == null) {
@@ -132,7 +133,7 @@ class CreateActivity : AppCompatActivity() {
         }
         val selectedUri: Uri? = data.data // single image
         val clipData: ClipData? = data.clipData // multi images
-        if (clipData != null) { // multi image처리
+        if (clipData != null) { // multi images 처리
             Log.i(TAG, "clipData numImages ${clipData.itemCount}: $clipData")
             for (i in 0 until clipData.itemCount) {
                 val clipItem = clipData.getItemAt(i)
@@ -209,6 +210,7 @@ class CreateActivity : AppCompatActivity() {
         }
     }
 
+    // firestore로 파일 경로 업로드
     private fun handleAllImagesUploaded(gameName: String, imageUrls: MutableList<String>) {
         // upload this info to firestore
         db.collection("games").document(gameName) // firestore api
@@ -227,7 +229,7 @@ class CreateActivity : AppCompatActivity() {
                         val resultData = Intent()
                         resultData.putExtra(EXTRA_GAME_NAME, gameName)
                         setResult(Activity.RESULT_OK, resultData)
-                        finish()
+                        finish() // 여기서 finish()로 CreateActivity를 종료하고 MainActivity로 돌아가면서 onActivityResult() 실행
                     }.show()
             }
     }

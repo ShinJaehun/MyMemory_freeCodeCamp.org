@@ -10,10 +10,12 @@ import android.view.LayoutInflater
 import android.view.Menu
 import android.view.MenuItem
 import android.view.View
+import android.widget.EditText
 import android.widget.RadioGroup
 import android.widget.TextView
 import androidx.appcompat.app.AlertDialog
 import androidx.constraintlayout.widget.ConstraintLayout
+import androidx.coordinatorlayout.widget.CoordinatorLayout
 import androidx.core.content.ContextCompat
 import androidx.recyclerview.widget.GridLayoutManager
 import androidx.recyclerview.widget.RecyclerView
@@ -25,6 +27,7 @@ import com.shinjaehun.mymemory.models.MemoryGame
 import com.shinjaehun.mymemory.models.UserImageList
 import com.shinjaehun.mymemory.utils.EXTRA_BOARD_SIZE
 import com.shinjaehun.mymemory.utils.EXTRA_GAME_NAME
+import com.squareup.picasso.Picasso
 
 class MainActivity : AppCompatActivity() {
 
@@ -36,7 +39,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var rvBoard: RecyclerView
     private lateinit var tvNumMoves: TextView
     private lateinit var tvNumPairs: TextView
-    private lateinit var clRoot: ConstraintLayout
+    private lateinit var clRoot: CoordinatorLayout
 
     private val db = Firebase.firestore
     private var gameName: String? = null
@@ -89,10 +92,15 @@ class MainActivity : AppCompatActivity() {
                 showCreationDialog()
                 return true
             }
+            R.id.mi_download -> {
+                showDownloadDialog()
+                return true
+            }
         }
         return super.onOptionsItemSelected(item)
     }
 
+    // CreateActivity의 handleAllImagesUploaded()에서 finish()에 의해 MainActivity로 돌아왔을 때 재호출
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         if (requestCode == CREATE_REQUEST_CODE && resultCode == Activity.RESULT_OK) {
            val customGameName = data?.getStringExtra(EXTRA_GAME_NAME)
@@ -105,7 +113,18 @@ class MainActivity : AppCompatActivity() {
         super.onActivityResult(requestCode, resultCode, data)
     }
 
-    // 게임 이름으로 firestore에서 이미지 경로 받아오기
+    // download 메뉴에서 선택!
+    private fun showDownloadDialog() {
+        val boardDownloadView = LayoutInflater.from(this).inflate(R.layout.dialog_download_board, null)
+        showAlertDialog("Fetch memory game", boardDownloadView, View.OnClickListener {
+            // grab the text of the game name that the user wants to download
+            val etDownloadGame = boardDownloadView.findViewById<EditText>(R.id.etDownloadGame)
+            val gameToDownload = etDownloadGame.text.toString().trim()
+            downloadGame(gameToDownload) // 이걸 이렇게 해서 연결!!!
+        })
+    }
+
+    // 게임 이름으로 firestore에 조회해서 이미지 경로 받아오기
     private fun downloadGame(customGameName: String) {
         db.collection("games").document(customGameName).get().addOnSuccessListener { document ->
             val userImageList = document.toObject(UserImageList::class.java)
@@ -114,11 +133,18 @@ class MainActivity : AppCompatActivity() {
                 Snackbar.make(clRoot, "Sorry, we couldn't find any such game, '$customGameName'", Snackbar.LENGTH_LONG).show()
                 return@addOnSuccessListener
             }
+
             val numCards = userImageList.images.size * 2
             boardSize = BoardSize.getByValue(numCards)
             customGameImages = userImageList.images
-            setupBoard()
+            // prefatch images : 이미지를 미리 다운로드해서 cache에 저장해두면 훨씬 빨라지겠지
+            for (imageUrl in userImageList.images) {
+                Picasso.get().load(imageUrl).fetch()
+            }
+            Snackbar.make(clRoot, "You're now playing '$customGameName'!", Snackbar.LENGTH_LONG).show()
+
             gameName = customGameName
+            setupBoard() // 기존 setupBoard()도 변경 불가피
         }.addOnFailureListener { exception ->
             Log.e(TAG, "Exception when retrieving game", exception)
         }
@@ -178,7 +204,8 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun setupBoard() {
-        supportActionBar?.title = gameName ?: getString(R.string.app_name)
+        supportActionBar?.title = gameName ?: getString(R.string.app_name) // 커스텀 게임인 경우 action bar에서 게임 이름 바꿔주기
+
         when(boardSize){
             BoardSize.EASY -> {
                 tvNumMoves.text = "Easy: 4 x 2"
@@ -197,7 +224,7 @@ class MainActivity : AppCompatActivity() {
         // 여기서 초기값을 줘야 color_progress_none부터 interpolation이 시작됨!
         tvNumPairs.setTextColor(ContextCompat.getColor(this, R.color.color_progress_none))
 
-        memoryGame = MemoryGame(boardSize, customGameImages)
+        memoryGame = MemoryGame(boardSize, customGameImages) // customGameImages가 존재하는지에 따라 게임 로직이 달라짐
         adapter = MemoryBoardAdapter(this, boardSize, memoryGame.cards, object: MemoryBoardAdapter.CardClickListener{
             override fun onCardClicked(position: Int) {
 //                Log.i(TAG, "Card clicked $position")

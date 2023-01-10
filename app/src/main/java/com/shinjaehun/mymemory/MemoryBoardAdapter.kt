@@ -62,9 +62,14 @@ class MemoryBoardAdapter(
 
 //            imageButton.setImageResource(if (memoryCard.isFaceUp) memoryCard.identifier else R.drawable.ic_launcher_background)
 
-            if (memoryCard.isFaceUp) { // 근데 이렇게 하지 말고 아예 처음부터 custom image인지 확인한 다음에 카드를 모두 받아두는게 맞지 않나?
+            // 근데 이렇게 하지 말고 아예 처음부터 custom image인지 확인한 다음에 카드를 모두 받아두는게 맞지 않나?
+            // delay를 줄이기 위해서 그렇게 함!
+            if (memoryCard.isFaceUp) {
                 if (memoryCard.imageUrl != null) {
-                    Picasso.get().load(memoryCard.imageUrl).into(imageButton)
+//                    Picasso.get().load(memoryCard.imageUrl).into(imageButton)
+                    // 피카소의 기능인데 다운로드가 다 되지 않았을 때 이걸 대신 잠깐 보여줌
+                    Picasso.get().load(memoryCard.imageUrl).placeholder(R.drawable.ic_image).into(imageButton)
+
                 } else {
                     imageButton.setImageResource(memoryCard.identifier)
                 }
