@@ -74,7 +74,7 @@ class MemoryBoardAdapter(
                     imageButton.setImageResource(memoryCard.identifier)
                 }
             } else {
-                imageButton.setImageResource(R.drawable.ic_launcher_background)
+                imageButton.setImageResource(R.drawable.bamboo)
             }
 
             // 짝을 맞췄을 때 흐림 효과
